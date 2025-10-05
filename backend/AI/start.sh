@@ -1,30 +1,38 @@
-#!/bin/bash
+# Use Ubuntu 22.04 as base
+FROM ubuntu:22.04
 
-echo "🚀 Starting Ollama FastAPI Server on Render..."
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    python3.12 \
+    python3.12-venv \
+    python3.12-distutils \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
 
-# Ensure model path exists
-mkdir -p /root/.ollama/models
+# Install Ollama CLI
+RUN curl -fsSL https://ollama.ai/install.sh | sh
 
-# Start Ollama in background
-ollama serve &
+# Add Ollama to PATH
+ENV PATH="$PATH:/usr/local/bin"
 
-# Wait until Ollama is ready
-echo "⏳ Waiting for Ollama to start..."
-until curl -s http://localhost:11434/api/tags > /dev/null; do
-    sleep 2
-done
-echo "✅ Ollama is running!"
+# Create app directory
+WORKDIR /app
 
-# Pull model if not already present
-MODEL_NAME="gemma2:2b"
-if ! ollama list | grep -q "$MODEL_NAME"; then
-    echo "📥 Pulling $MODEL_NAME model..."
-    ollama pull "$MODEL_NAME"
-    echo "✅ Model pulled successfully!"
-else
-    echo "✅ Model $MODEL_NAME already exists!"
-fi
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Start FastAPI
-echo "🌐 Starting FastAPI on port $PORT..."
-python3 -m uvicorn gpt:app --host 0.0.0.0 --port $PORT
+# Copy application code
+COPY . .
+
+# Make start.sh executable
+RUN chmod +x start.sh
+
+# Render assigns the port dynamically
+EXPOSE 8080
+
+# Start the app
+CMD ["./start.sh"]
