@@ -1,0 +1,32 @@
+#!/bin/bash
+
+echo "🚀 Starting Ollama FastAPI Server on Railway..."
+
+# Start Ollama in background
+echo "Starting Ollama service..."
+ollama serve &
+
+# Wait for Ollama to start
+echo "Waiting for Ollama to start..."
+sleep 15
+
+# Check if Ollama is running
+if curl -s http://localhost:11434/api/tags > /dev/null; then
+    echo "✅ Ollama is running!"
+    
+    # Check if model exists, if not pull it
+    if ! ollama list | grep -q "gemma2:2b"; then
+        echo "📥 Pulling gemma2:2b model..."
+        ollama pull gemma2:2b
+        echo "✅ Model pulled successfully!"
+    else
+        echo "✅ Model already exists!"
+    fi
+else
+    echo "❌ Ollama failed to start"
+    exit 1
+fi
+
+echo "🌐 Starting FastAPI server on port $PORT..."
+# Start FastAPI server
+python -m uvicorn gpt:app --host 0.0.0.0 --port $PORT

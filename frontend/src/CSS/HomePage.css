@@ -1,0 +1,41 @@
+@media (max-width: 768px) {
+  /* Hero Section */
+  .homepage-hero {
+    padding: 80px 15px 40px 15px;
+  }
+
+  .homepage-hero h1 {
+    font-size: 2rem;
+  }
+
+  .homepage-hero p {
+    font-size: 1rem;
+    max-width: 90%;
+  }
+
+  .homepage-hero a {
+    padding: 12px 20px;
+    font-size: 0.95rem;
+  }
+
+  /* Cards */
+  .homepage-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 30px;
+  }
+
+  .homepage-grid {
+    grid-template-columns: 1fr; /* stack on mobile */
+    gap: 16px;
+  }
+
+  .homepage-card {
+    padding: 16px;
+    font-size: 0.95rem;
+  }
+
+  .homepage-card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+  }
+}

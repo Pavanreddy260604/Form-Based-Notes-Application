@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: ollama-fastapi
+    env: docker
+    plan: free
+    docker:
+      dockerfilePath: ./Dockerfile
+    envVars:
+      - key: OLLAMA_HOST
+        value: 0.0.0.0
+      - key: OLLAMA_MODELS
+        value: /root/.ollama/models
+    healthCheckPath: /health
