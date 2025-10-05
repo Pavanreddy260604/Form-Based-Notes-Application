@@ -1,15 +1,15 @@
-# Base image
+# Use Ubuntu 22.04 as base
 FROM ubuntu:22.04
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
+    git \
     python3.12 \
     python3.12-venv \
     python3.12-distutils \
     python3-pip \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Ollama CLI
@@ -31,7 +31,7 @@ COPY . .
 # Make start.sh executable
 RUN chmod +x start.sh
 
-# Expose any port (Render will assign $PORT)
+# Render assigns the port dynamically
 EXPOSE 8080
 
 # Start the app
