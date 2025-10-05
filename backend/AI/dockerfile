@@ -1,32 +1,38 @@
-#!/bin/bash
+# Base image
+FROM ubuntu:22.04
 
-echo "🚀 Starting Ollama FastAPI Server on Railway..."
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    python3.12 \
+    python3.12-venv \
+    python3.12-distutils \
+    python3-pip \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-# Start Ollama in background
-echo "Starting Ollama service..."
-ollama serve &
+# Install Ollama CLI
+RUN curl -fsSL https://ollama.ai/install.sh | sh
 
-# Wait for Ollama to start
-echo "Waiting for Ollama to start..."
-sleep 15
+# Add Ollama to PATH
+ENV PATH="$PATH:/usr/local/bin"
 
-# Check if Ollama is running
-if curl -s http://localhost:11434/api/tags > /dev/null; then
-    echo "✅ Ollama is running!"
-    
-    # Check if model exists, if not pull it
-    if ! ollama list | grep -q "gemma2:2b"; then
-        echo "📥 Pulling gemma2:2b model..."
-        ollama pull gemma2:2b
-        echo "✅ Model pulled successfully!"
-    else
-        echo "✅ Model already exists!"
-    fi
-else
-    echo "❌ Ollama failed to start"
-    exit 1
-fi
+# Create app directory
+WORKDIR /app
 
-echo "🌐 Starting FastAPI server on port $PORT..."
-# Start FastAPI server
-python -m uvicorn gpt:app --host 0.0.0.0 --port $PORT
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Make start.sh executable
+RUN chmod +x start.sh
+
+# Expose any port (Render will assign $PORT)
+EXPOSE 8080
+
+# Start the app
+CMD ["./start.sh"]
