@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { Routes, Route, useLocation, Navigate, useParams } from "react-router-dom";
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
 import { ToastContainer, toast } from "react-toastify";
@@ -22,8 +22,56 @@ NProgress.configure({
   trickleSpeed: 200,
 });
 
+// Wrapper component that fetches topic data and passes as props to Frame
+function FrameWrapper() {
+  const { topicId } = useParams();
+  const [topicData, setTopicData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchTopicData() {
+      try {
+        setLoading(true);
+        const backendUrl = import.meta.env.VITE_BACKEND_URL;
+        const response = await fetch(`${backendUrl}/api/items/${topicId}`);
+        
+        if (!response.ok) throw new Error("Not found");
+        
+        const result = await response.json();
+        
+        // ✅ EXTRACT data from { success: true, data: {...} }
+        const actualData = result.data || result;
+        
+        console.log("Fetched topic:", actualData);
+        setTopicData(actualData);
+      } catch (err) {
+        console.error("Error fetching topic:", err);
+        setTopicData(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchTopicData();
+  }, [topicId]);
+
+  if (loading) return <div style={{padding: 80, textAlign: "center", color: "#666"}}>Loading topic...</div>;
+  if (!topicData) return <div style={{padding: 80, textAlign: "center", color: "#666"}}>Topic not found</div>;
+
+  // Pass fetched data as props to Frame
+  return (
+    <Frame 
+      title={topicData.title}
+      intro={topicData.intro}
+      why={topicData.why}
+      examples={topicData.examples}
+      best={topicData.best}
+    />
+  );
+}
+
+
 function App() {
-  const [allTopics, setAllTopics] = useState([]); // Always an array
+  const [allTopics, setAllTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [user, setUser] = useState(null);
@@ -82,9 +130,8 @@ function App() {
     const fetchData = async () => {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-        // ✅ Validate backend URL is configured
         const backendUrl = import.meta.env.VITE_BACKEND_URL;
         if (!backendUrl) {
           throw new Error("VITE_BACKEND_URL is not defined in .env file");
@@ -105,17 +152,15 @@ function App() {
 
         const rawData = await response.json();
 
-        // ✅ CRITICAL: Safely extract array from common response formats
         let topicsArray = [];
         if (Array.isArray(rawData)) {
           topicsArray = rawData;
         } else if (rawData && Array.isArray(rawData.items)) {
-          topicsArray = rawData.items; // { items: [...] }
+          topicsArray = rawData.items;
         } else if (rawData && Array.isArray(rawData.data)) {
-          topicsArray = rawData.data;   // { data: [...] }
+          topicsArray = rawData.data;
         } else {
           console.warn("API returned unexpected format:", rawData);
-          // Still proceed with empty array to avoid crash
         }
 
         setAllTopics(topicsArray);
@@ -129,7 +174,7 @@ function App() {
       } catch (err) {
         console.error("Fetch error:", err);
         setError(true);
-        setAllTopics([]); // Ensure it's always an array
+        setAllTopics([]);
         
         if (err.message.includes("VITE_BACKEND_URL")) {
           toast.error("Backend URL not configured. Check .env file.", {
@@ -162,7 +207,6 @@ function App() {
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
-  // Enhanced loading state
   if (loading) {
     return (
       <div className="app-loading">
@@ -175,7 +219,6 @@ function App() {
     );
   }
 
-  // Enhanced error state
   if (error) {
     return (
       <div className="error-container">
@@ -213,15 +256,12 @@ function App() {
   return (
     <ErrorBoundary>
       <div className="app-container">
-        {/* Network Status Indicator */}
         <NetworkStatusIndicator isOnline={networkStatus} />
 
-        {/* Navigation */}
         {location.pathname !== "/Login" && (
           <NavBar user={user} setUser={setUser} />
         )}
 
-        {/* Main Content */}
         <main 
           className={`main-content ${
             location.pathname === "/Login" ? "login-page" : ""
@@ -229,8 +269,6 @@ function App() {
         >
           <Routes>
             <Route path="/Login" element={<LoginPage setUser={setUser} />} />
-
-            {/* Protected routes */}
             <Route path="/" element={<Topics user={user} />} />
             <Route path="/add-topic" element={<AddTopicForm user={user} />} />
             <Route 
@@ -261,22 +299,8 @@ function App() {
               } 
             />
 
-            {/* ✅ SAFE: Only map if allTopics is confirmed array */}
-            {Array.isArray(allTopics) && allTopics.map(topic => (
-              <Route
-                key={topic._id || topic.path} // Fallback key if _id missing
-                path={topic.path}
-                element={
-                  <Frame
-                    title={topic.title}
-                    intro={topic.intro}
-                    why={topic.why}
-                    examples={topic.examples}
-                    best={topic.best}
-                  />
-                }
-              />
-            ))}
+            {/* Dynamic topic route - uses FrameWrapper to fetch and pass props */}
+            <Route path="/topic/:topicId" element={<FrameWrapper />} />
 
             {/* 404 Fallback */}
             <Route 
@@ -297,7 +321,6 @@ function App() {
           </Routes>
         </main>
 
-        {/* Toast Notifications */}
         <ToastContainer
           position="top-right"
           autoClose={5000}

@@ -504,11 +504,11 @@ const Topics = ({ user }) => {
                 <>
                   <div style={styles.topicContent}>
                     <Link
-                      to={topic.path}
-                      style={styles.topicLink}
-                    >
-                      <h3 style={styles.topicTitle}>{topic.title}</h3>
-                    </Link>
+  to={`/topic/${topic._id}`}
+  style={styles.topicLink}
+>
+  <h3 style={styles.topicTitle}>{topic.title}</h3>
+</Link>
                     {topic.intro && (
                       <p style={styles.topicIntro}>{topic.intro}</p>
                     )}
