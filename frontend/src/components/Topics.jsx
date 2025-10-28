@@ -35,7 +35,7 @@ const Topics = ({ user }) => {
       setLoading(true);
       setError("");
       
-      const response = await fetch(`http://localhost:5000/api/items/user/${user.userId}`);
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/items/user/${user.userId}`);
       
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status}`);
@@ -74,7 +74,7 @@ const Topics = ({ user }) => {
 
     setDeletingId(topicId);
     try {
-      const response = await fetch(`http://localhost:5000/api/items/${topicId}`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/items/${topicId}`, {
         method: "DELETE",
       });
 
@@ -192,7 +192,7 @@ const Topics = ({ user }) => {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/items/${topicId}`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/items/${topicId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

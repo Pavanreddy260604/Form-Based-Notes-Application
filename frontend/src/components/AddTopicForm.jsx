@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from 'react-hot-toast';
 
-// AI Assistant Component (same as in Topics.jsx)
+// AI Assistant Component
 const AIAssistant = ({ isOpen, onClose, user }) => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -35,92 +35,129 @@ const AIAssistant = ({ isOpen, onClose, user }) => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
+const handleSendMessage = async () => {
+  if (!inputMessage.trim() || isLoading) return;
 
-    const userMessage = {
-      id: Date.now(),
-      content: inputMessage,
-      role: 'user',
+  const userMessage = {
+    id: Date.now(),
+    content: inputMessage,
+    role: 'user',
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  };
+
+  setMessages(prev => [...prev, userMessage]);
+  setInputMessage('');
+  setIsLoading(true);
+
+  try {
+    const aiUrl = import.meta.env.VITE_AI_URL;
+    
+    console.log('AI URL:', aiUrl);
+    
+    if (!aiUrl) {
+      throw new Error('AI server URL not configured');
+    }
+
+    const baseUrl = aiUrl.replace(/\/$/, '');
+    const apiUrl = `${baseUrl}/api/ai/chat`;
+    
+    console.log('Making request to:', apiUrl);
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true"
+      },
+      body: JSON.stringify({
+        message: inputMessage,
+        userId: user?.userId || 'anonymous',
+        model: "YJ"
+      }),
+    });
+
+    console.log('Response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error response:', errorText);
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    
+    let assistantMessage = {
+      id: Date.now() + 1,
+      content: '',
+      role: 'assistant',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setMessages(prev => [...prev, userMessage]);
-    setInputMessage('');
-    setIsLoading(true);
+    setMessages(prev => [...prev, assistantMessage]);
 
-    try {
-      const response = await fetch('http://localhost:8000/api/ai/chat', {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: inputMessage,
-          userId: user?.userId,
-          model: "gemma3:4b"
-        }),
-      });
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      const chunk = decoder.decode(value, { stream: true });
+      console.log("Raw chunk:", chunk); // Debug logging
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+      // Split by double newline (SSE delimiter) or single newline
+      const lines = chunk.split('\n\n');
       
-      let assistantMessage = {
-        id: Date.now() + 1,
-        content: '',
-        role: 'assistant',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.content) {
-                assistantMessage.content += data.content;
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  newMessages[newMessages.length - 1] = { ...assistantMessage };
-                  return newMessages;
-                });
-              }
-              if (data.finish_reason === 'stop') {
-                break;
-              }
-            } catch (e) {
-              console.log('Skipping line:', line);
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        // Skip empty lines
+        if (!trimmedLine) continue;
+        
+        // Handle both formats: raw JSON and data: prefix
+        let jsonString = trimmedLine;
+        if (trimmedLine.startsWith('data: ')) {
+          jsonString = trimmedLine.slice(6); // Remove 'data: ' prefix
+        }
+        
+        // Parse if it looks like JSON
+        if (jsonString.startsWith('{') && jsonString.endsWith('}')) {
+          try {
+            const data = JSON.parse(jsonString);
+            console.log("Parsed data:", data); // Debug logging
+            
+            if (data.content) {
+              assistantMessage.content += data.content;
+              setMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1] = { ...assistantMessage };
+                return newMessages;
+              });
             }
+            if (data.finish_reason === 'stop') {
+              console.log("Stream finished with stop reason");
+              break;
+            }
+          } catch (e) {
+            console.log('Failed to parse JSON:', jsonString, 'Error:', e);
           }
+        } else {
+          console.log('Skipping non-JSON line:', trimmedLine);
         }
       }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      const errorMessage = {
-        id: Date.now() + 1,
-        content: 'Sorry, I encountered an error. Please check if the AI server is running on port 8000.',
-        role: 'assistant',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isError: true
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
     }
-  };
-
+  } catch (error) {
+    console.error('Error sending message:', error);
+    const errorMessage = {
+      id: Date.now() + 1,
+      content: `Error: ${error.message}. Please check if the AI server is running and accessible.`,
+      role: 'assistant',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isError: true
+    };
+    setMessages(prev => [...prev, errorMessage]);
+  } finally {
+    setIsLoading(false);
+  }
+};
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -838,7 +875,8 @@ const AddNoteForm = ({ user }) => {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/items/", {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+      const res = await fetch(`${backendUrl}/api/items/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)

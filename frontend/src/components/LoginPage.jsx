@@ -33,7 +33,7 @@ export default function LoginPage({ setUser }) {
     setSuccess("");
 
     try {
-      const response = await fetch("http://localhost:5000/api/users/register-send-otp", {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/users/register-send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
@@ -59,7 +59,7 @@ export default function LoginPage({ setUser }) {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:5000/api/users/register-verify-otp", {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/users/register-verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -97,7 +97,7 @@ export default function LoginPage({ setUser }) {
     setSuccess("");
 
     try {
-      const response = await fetch("http://localhost:5000/api/users/login", {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/users/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -144,7 +144,7 @@ export default function LoginPage({ setUser }) {
     setError("");
     
     try {
-      const response = await fetch("http://localhost:5000/api/users/forgot-password-send-otp", {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/users/forgot-password-send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
@@ -180,7 +180,7 @@ export default function LoginPage({ setUser }) {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:5000/api/users/reset-password-with-otp", {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/users/reset-password-with-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -23,7 +23,7 @@ NProgress.configure({
 });
 
 function App() {
-  const [allTopics, setAllTopics] = useState([]);
+  const [allTopics, setAllTopics] = useState([]); // Always an array
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [user, setUser] = useState(null);
@@ -62,8 +62,9 @@ function App() {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
-        toast.info(`Welcome back, ${JSON.parse(savedUser).name || 'User'}!`, {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        toast.info(`Welcome back, ${parsedUser.name || 'User'}!`, {
           position: "top-right",
           autoClose: 2000,
         });
@@ -83,7 +84,13 @@ function App() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-        const response = await fetch("https://reactjourney.onrender.com/api/items", {
+        // ✅ Validate backend URL is configured
+        const backendUrl = import.meta.env.VITE_BACKEND_URL;
+        if (!backendUrl) {
+          throw new Error("VITE_BACKEND_URL is not defined in .env file");
+        }
+
+        const response = await fetch(`${backendUrl}/api/items`, {
           signal: controller.signal,
           headers: {
             'Content-Type': 'application/json',
@@ -96,11 +103,25 @@ function App() {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        const data = await response.json();
-        setAllTopics(data);
+        const rawData = await response.json();
+
+        // ✅ CRITICAL: Safely extract array from common response formats
+        let topicsArray = [];
+        if (Array.isArray(rawData)) {
+          topicsArray = rawData;
+        } else if (rawData && Array.isArray(rawData.items)) {
+          topicsArray = rawData.items; // { items: [...] }
+        } else if (rawData && Array.isArray(rawData.data)) {
+          topicsArray = rawData.data;   // { data: [...] }
+        } else {
+          console.warn("API returned unexpected format:", rawData);
+          // Still proceed with empty array to avoid crash
+        }
+
+        setAllTopics(topicsArray);
         setLoading(false);
         
-        if (data.length === 0) {
+        if (topicsArray.length === 0) {
           toast.info("No topics available yet. Be the first to add one!", {
             position: "bottom-center",
           });
@@ -108,8 +129,13 @@ function App() {
       } catch (err) {
         console.error("Fetch error:", err);
         setError(true);
+        setAllTopics([]); // Ensure it's always an array
         
-        if (err.name === 'AbortError') {
+        if (err.message.includes("VITE_BACKEND_URL")) {
+          toast.error("Backend URL not configured. Check .env file.", {
+            position: "top-center",
+          });
+        } else if (err.name === 'AbortError') {
           toast.error("Request timeout - server is taking too long to respond", {
             position: "top-center",
           });
@@ -143,7 +169,7 @@ function App() {
         <HomePageSkeleton />
         <div className="loading-overlay">
           <div className="loading-spinner"></div>
-          <p>Loading your learning journey...</p>
+          <p>Loading notes application</p>
         </div>
       </div>
     );
@@ -186,7 +212,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className="app-container"  >
+      <div className="app-container">
         {/* Network Status Indicator */}
         <NetworkStatusIndicator isOnline={networkStatus} />
 
@@ -205,7 +231,6 @@ function App() {
             <Route path="/Login" element={<LoginPage setUser={setUser} />} />
 
             {/* Protected routes */}
-            
             <Route path="/" element={<Topics user={user} />} />
             <Route path="/add-topic" element={<AddTopicForm user={user} />} />
             <Route 
@@ -236,10 +261,10 @@ function App() {
               } 
             />
 
-            {/* Dynamic topic routes */}
-            {allTopics.map(topic => (
+            {/* ✅ SAFE: Only map if allTopics is confirmed array */}
+            {Array.isArray(allTopics) && allTopics.map(topic => (
               <Route
-                key={topic._id}
+                key={topic._id || topic.path} // Fallback key if _id missing
                 path={topic.path}
                 element={
                   <Frame
@@ -288,17 +313,16 @@ function App() {
       </div>
 
       <style jsx>{`
-   html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  width: 100%;
-}
+        html, body {
+          margin: 0;
+          padding: 0;
+          height: 100%;
+          width: 100%;
+        }
 
         .app-container {
           min-height: 100vh;
           position: relative;
-          
         }
 
         .app-loading {

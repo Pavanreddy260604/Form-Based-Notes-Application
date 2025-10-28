@@ -43,7 +43,8 @@ const useSearch = (initialQuery = "", user = null) => {
     setSearchState(prev => ({ ...prev, isLoading: true }));
 
     try {
-      const userItemsResponse = await fetch(`http://localhost:5000/api/items/user/${user.userId}`);
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+      const userItemsResponse = await fetch(`${backendUrl}/api/items/user/${user.userId}`);
       
       if (!userItemsResponse.ok) {
         throw new Error('Failed to fetch user items');
@@ -68,6 +69,7 @@ const useSearch = (initialQuery = "", user = null) => {
       }));
 
     } catch (error) {
+      console.error('Search error:', error);
       setSearchState(prev => ({ 
         ...prev, 
         results: [],
@@ -153,7 +155,8 @@ const AIAssistant = ({ isOpen, onClose, user }) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/ai/chat', {
+      const backendUrl = import.meta.env.VITE_AI_URL || 'http://localhost:5000';
+      const response = await fetch(`${backendUrl}/api/ai/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -186,12 +189,25 @@ const AIAssistant = ({ isOpen, onClose, user }) => {
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+        console.log("Raw chunk:", chunk);
 
+        // Enhanced parsing to handle different formats
+        const lines = chunk.split('\n');
+        
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine) continue;
+          
+          let jsonString = trimmedLine;
+          if (trimmedLine.startsWith('data: ')) {
+            jsonString = trimmedLine.slice(6);
+          }
+          
+          if (jsonString.startsWith('{') && jsonString.endsWith('}')) {
             try {
-              const data = JSON.parse(line.slice(6));
+              const data = JSON.parse(jsonString);
+              console.log("Parsed data:", data);
+              
               if (data.content) {
                 assistantMessage.content += data.content;
                 setMessages(prev => {
@@ -204,7 +220,7 @@ const AIAssistant = ({ isOpen, onClose, user }) => {
                 break;
               }
             } catch (e) {
-              console.log('Skipping line:', line);
+              console.log('Failed to parse JSON:', jsonString);
             }
           }
         }
@@ -213,7 +229,7 @@ const AIAssistant = ({ isOpen, onClose, user }) => {
       console.error('Error sending message:', error);
       const errorMessage = {
         id: Date.now() + 1,
-        content: 'Sorry, I encountered an error. Please check if the AI server is running on port 8000.',
+        content: 'Sorry, I encountered an error. Please check if the AI server is running.',
         role: 'assistant',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isError: true
@@ -707,6 +723,7 @@ const aiStyles = {
     border: '2px solid transparent',
     borderTop: '2px solid white',
     borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
   },
   sendIcon: {
     fontSize: '18px',
